@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord — ETL Manager{% endblock %}
+{% block page_title %}Tableau de bord{% endblock %}
+
+{% block header_actions %}
+<a href="/projects/new"
+   class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700
+          text-white text-sm font-medium rounded-lg transition-colors">
+  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+  </svg>
+  Nouveau projet
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- Stats row -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-200 dark:border-gray-800 shadow-sm">
+    <p class="text-sm text-gray-500 dark:text-gray-400">Projets actifs</p>
+    <p class="text-3xl font-bold text-indigo-600 mt-1">{{ total_projects }}</p>
+  </div>
+  <div class="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-200 dark:border-gray-800 shadow-sm">
+    <p class="text-sm text-gray-500 dark:text-gray-400">Connexions SQL Server</p>
+    <p class="text-3xl font-bold text-indigo-600 mt-1">{{ total_connections }}</p>
+  </div>
+  <div class="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-200 dark:border-gray-800 shadow-sm">
+    <p class="text-sm text-gray-500 dark:text-gray-400">Environnements</p>
+    <div class="flex gap-2 mt-2 flex-wrap">
+      {% for env in environments %}
+      <span class="px-2 py-1 text-xs font-medium rounded-full
+                   {% if env == 'PROD' %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400
+                   {% elif env == 'PREPROD' %}bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400
+                   {% elif env == 'RECETTE' %}bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400
+                   {% else %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400{% endif %}">
+        {{ env }}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Projects grid -->
+<div x-data="{ search: '' }">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Mes projets ETL</h2>
+    <div class="relative">
+      <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input x-model="search" type="text" placeholder="Rechercher un projet..."
+             class="pl-9 pr-4 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200
+                    dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                    focus:ring-indigo-500 w-64 text-gray-900 dark:text-white"/>
+    </div>
+  </div>
+
+  {% if projects %}
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    {% for project in projects %}
+    <div x-show="!search || '{{ project.name }}'.toLowerCase().includes(search.toLowerCase())"
+         class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800
+                shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700
+                transition-all duration-200 group">
+      <div class="p-5">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-900 dark:text-white text-sm">{{ project.name }}</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400">v{{ project.version }}</p>
+            </div>
+          </div>
+          <span class="text-xs text-gray-400">
+            {{ project.updated_at[:10] if project.updated_at else '' }}
+          </span>
+        </div>
+
+        {% if project.description %}
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">{{ project.description }}</p>
+        {% endif %}
+
+        <!-- Pipeline progress -->
+        <div class="mb-4">
+          <div class="flex justify-between text-xs text-gray-500 mb-1.5">
+            <span>Pipeline configuré</span>
+            <span class="font-medium text-indigo-600">{{ project.progress }}%</span>
+          </div>
+          <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
+            <div class="bg-indigo-600 h-1.5 rounded-full transition-all"
+                 style="width: {{ project.progress }}%"></div>
+          </div>
+        </div>
+
+        <!-- Steps status chips -->
+        <div class="flex gap-1 flex-wrap mb-4">
+          {% set step_labels = [('csv', 'CSV'), ('sta', 'STA'), ('ods', 'ODS'), ('dim', 'DIM'), ('fait', 'FAIT'), ('post', 'POST')] %}
+          {% for key, label in step_labels %}
+          <span class="px-2 py-0.5 text-xs rounded font-medium
+                       {% if project.configured_steps > loop.index0 %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400
+                       {% else %}bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500{% endif %}">
+            {{ label }}
+          </span>
+          {% endfor %}
+        </div>
+
+        <div class="flex gap-2">
+          <a href="/projects/{{ project.id }}"
+             class="flex-1 text-center px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700
+                    text-white rounded-lg transition-colors">
+            Ouvrir
+          </a>
+          <button onclick="deleteProject({{ project.id }}, '{{ project.name }}')"
+                  class="px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50
+                         dark:hover:bg-red-900/20 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <!-- Empty state -->
+  <div class="text-center py-20">
+    <div class="w-20 h-20 bg-indigo-50 dark:bg-indigo-950 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-10 h-10 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Aucun projet ETL</h3>
+    <p class="text-gray-500 dark:text-gray-400 mb-6">Créez votre premier projet pour commencer à définir votre pipeline ETL.</p>
+    <a href="/projects/new"
+       class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700
+              text-white font-medium rounded-lg transition-colors">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Créer un projet
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteProject(id, name) {
+  if (!confirm(`Supprimer le projet "${name}" ?`)) return;
+  try {
+    await apiCall(`/api/projects/${id}`, 'DELETE');
+    showToast(`Projet "${name}" supprimé`, 'success');
+    setTimeout(() => location.reload(), 800);
+  } catch (e) {}
+}
+</script>
+{% endblock %}

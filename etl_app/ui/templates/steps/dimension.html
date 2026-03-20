@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Dimensions — Projet {{ project_id }}{% endblock %}
+{% block page_title %}Étape 4 — Création Dimensions{% endblock %}
+
+{% block breadcrumb %}
+<nav class="flex items-center gap-2 text-sm">
+  <a href="/" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projets</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <a href="/projects/{{ project_id }}" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projet #{{ project_id }}</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="font-semibold">Dimensions</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div x-data="dimensionStep({{ project_id }}, {{ config | tojson }}, {{ ods_columns | tojson }})" class="space-y-6">
+
+  <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900 dark:text-white mb-4">Configuration de la dimension</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          Nom de la table <span class="text-red-500">*</span>
+        </label>
+        <div class="flex gap-2 items-center">
+          <span class="text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-2 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-700">dim.</span>
+          <input x-model="form.table_name" type="text" placeholder="dim_produit"
+                 class="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded-r-lg focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Table ODS source</label>
+        <input x-model="form.source_ods_table" type="text"
+               class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                      dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                      focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+      </div>
+    </div>
+
+    <!-- SK + Load mode -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+      <div>
+        <label class="flex items-center gap-2 cursor-pointer mb-3">
+          <input type="checkbox" x-model="form.use_surrogate_key"
+                 class="w-4 h-4 text-indigo-600 rounded border-gray-300"/>
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Clé de substitution (Surrogate Key)</span>
+        </label>
+        <div x-show="form.use_surrogate_key" class="mt-2">
+          <label class="block text-xs text-gray-500 mb-1">Nom de la colonne SK</label>
+          <input x-model="form.surrogate_key_column" type="text"
+                 class="w-full px-2 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+        </div>
+      </div>
+
+      <div>
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Mode de chargement</p>
+        <label class="flex items-center gap-2 mb-2 cursor-pointer">
+          <input type="radio" x-model="form.load_mode" value="insert"
+                 class="text-indigo-600"/>
+          <span class="text-sm text-gray-700 dark:text-gray-300">INSERT — Ajout uniquement</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" x-model="form.load_mode" value="merge"
+                 class="text-indigo-600"/>
+          <span class="text-sm text-gray-700 dark:text-gray-300">MERGE / UPSERT — Mise à jour + insertion</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Merge config -->
+    <div x-show="form.load_mode === 'merge'" x-cloak
+         class="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+      <h4 class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-3">Configuration MERGE</h4>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Clé(s) métier (Business Key)</p>
+          <div class="space-y-1">
+            <template x-for="col in odsCols">
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" :value="col"
+                       :checked="form.business_key_columns.includes(col)"
+                       @change="toggleBK(col)"
+                       class="w-3.5 h-3.5 text-amber-600 rounded"/>
+                <span x-text="col" class="text-gray-700 dark:text-gray-300 font-mono text-xs"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Colonnes surveillées (UPDATE)</p>
+          <div class="space-y-1">
+            <template x-for="col in odsCols">
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" :value="col"
+                       :checked="form.tracked_columns.includes(col)"
+                       @change="toggleTracked(col)"
+                       class="w-3.5 h-3.5 text-amber-600 rounded"/>
+                <span x-text="col" class="text-gray-700 dark:text-gray-300 font-mono text-xs"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column selection -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Colonnes à inclure dans la dimension
+          <span class="text-xs text-gray-500 ml-1">(<span x-text="form.selected_columns.length"></span> sélectionnées)</span>
+        </p>
+        <button @click="form.selected_columns = [...odsCols]" class="text-xs text-indigo-600 hover:underline">Tout sélectionner</button>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <template x-for="col in odsCols">
+          <label class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-all text-sm
+                        font-mono"
+                 :class="form.selected_columns.includes(col)
+                   ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-400 text-indigo-700 dark:text-indigo-300'
+                   : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'">
+            <input type="checkbox" :checked="form.selected_columns.includes(col)"
+                   @change="toggleCol(col)" class="hidden"/>
+            <span x-text="col"></span>
+          </label>
+        </template>
+      </div>
+    </div>
+
+    <div class="mt-6 flex gap-3">
+      <button @click="save" :disabled="!form.table_name || saving"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                     rounded-lg transition-colors disabled:opacity-50">
+        <span x-show="!saving">💾 Sauvegarder</span>
+        <span x-show="saving" x-cloak>...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SQL Preview -->
+  <div x-show="form.table_name" x-cloak
+       class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+      <h3 class="font-semibold text-gray-900 dark:text-white">SQL généré</h3>
+    </div>
+    <div class="p-4">
+      <pre class="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap"><code x-text="sqlPreview"></code></pre>
+      <button @click="refreshSql" class="mt-2 text-xs text-indigo-600 hover:underline">↻ Actualiser le SQL</button>
+    </div>
+  </div>
+
+  <div class="flex justify-between">
+    <a href="/projects/{{ project_id }}/pipeline/ods"
+       class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300
+              rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm">
+      ← Étape 3 : ODS
+    </a>
+    <a href="/projects/{{ project_id }}/pipeline/fact"
+       class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+      Étape 5 : Faits →
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dimensionStep(projectId, initConfig, odsCols) {
+  return {
+    form: {
+      table_name: initConfig.table_name || '',
+      source_ods_table: initConfig.source_ods_table || '',
+      use_surrogate_key: initConfig.use_surrogate_key !== false,
+      surrogate_key_column: initConfig.surrogate_key_column || 'sk_id',
+      load_mode: initConfig.load_mode || 'insert',
+      business_key_columns: initConfig.business_key_columns || [],
+      tracked_columns: initConfig.tracked_columns || [],
+      selected_columns: initConfig.selected_columns || [],
+    },
+    odsCols: odsCols,
+    saving: false,
+    sqlPreview: '',
+
+    toggleBK(col) {
+      const i = this.form.business_key_columns.indexOf(col);
+      i >= 0 ? this.form.business_key_columns.splice(i,1) : this.form.business_key_columns.push(col);
+    },
+    toggleTracked(col) {
+      const i = this.form.tracked_columns.indexOf(col);
+      i >= 0 ? this.form.tracked_columns.splice(i,1) : this.form.tracked_columns.push(col);
+    },
+    toggleCol(col) {
+      const i = this.form.selected_columns.indexOf(col);
+      i >= 0 ? this.form.selected_columns.splice(i,1) : this.form.selected_columns.push(col);
+    },
+
+    async refreshSql() {
+      try {
+        const data = await apiCall(`/api/pipeline/${projectId}/view/dimension`);
+        // Build preview locally
+        const bks = this.form.business_key_columns.join(', ') || 'N/A';
+        const sk = this.form.use_surrogate_key ? `  [${this.form.surrogate_key_column}] INT IDENTITY(1,1) NOT NULL,\n` : '';
+        const cols = this.form.selected_columns.map(c => `  [${c}] NVARCHAR(500) NULL`).join(',\n');
+        this.sqlPreview = `-- dim.${this.form.table_name}\n-- Mode: ${this.form.load_mode.toUpperCase()}\n-- BK: ${bks}\n\nCREATE TABLE [dim].[${this.form.table_name}] (\n${sk}${cols}\n);`;
+      } catch(e) {}
+    },
+
+    async save() {
+      this.saving = true;
+      try {
+        await apiCall(`/api/pipeline/${projectId}/steps/dimension`, 'PUT', { config: this.form });
+        showToast('Configuration dimension sauvegardée', 'success');
+        await this.refreshSql();
+      } catch(e) {} finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

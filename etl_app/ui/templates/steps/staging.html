@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Staging — Projet {{ project_id }}{% endblock %}
+{% block page_title %}Étape 2 — Chargement Staging{% endblock %}
+
+{% block breadcrumb %}
+<nav class="flex items-center gap-2 text-sm">
+  <a href="/" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projets</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <a href="/projects/{{ project_id }}" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projet #{{ project_id }}</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="font-semibold">Staging</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div x-data="stagingStep({{ project_id }}, {{ config | tojson }}, {{ available_columns | tojson }})" class="space-y-6">
+
+  <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900 dark:text-white mb-4">Configuration Staging</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          Nom de la table staging <span class="text-red-500">*</span>
+        </label>
+        <div class="flex gap-2 items-center">
+          <span class="text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-2 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-700">sta.</span>
+          <input x-model="form.table_name" type="text" placeholder="nom_table"
+                 class="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded-r-lg focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Taille des lots (batch)</label>
+        <input x-model.number="form.batch_size" type="number" min="100" max="10000" step="100"
+               class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                      dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                      focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" x-model="form.truncate_before_load"
+                 class="w-4 h-4 text-indigo-600 rounded border-gray-300"/>
+          <span class="text-sm text-gray-700 dark:text-gray-300">TRUNCATE avant chargement</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Column selection -->
+    <div>
+      <div class="flex items-center justify-between mb-3">
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Colonnes à importer
+          <span class="ml-2 text-xs text-gray-500">(<span x-text="form.selected_columns.length"></span> / {{ available_columns | length }} sélectionnées)</span>
+        </label>
+        <div class="flex gap-2">
+          <button @click="selectAll" class="text-xs text-indigo-600 hover:underline">Tout sélectionner</button>
+          <span class="text-gray-300">|</span>
+          <button @click="selectNone" class="text-xs text-indigo-600 hover:underline">Tout désélectionner</button>
+        </div>
+      </div>
+
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+        {% if available_columns %}
+        {% for col in available_columns %}
+        <label class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800
+                      cursor-pointer border-b border-gray-100 dark:border-gray-800 last:border-0">
+          <input type="checkbox" :value="'{{ col }}'"
+                 :checked="form.selected_columns.includes('{{ col }}')"
+                 @change="toggleColumn('{{ col }}')"
+                 class="w-4 h-4 text-indigo-600 rounded border-gray-300"/>
+          <span class="text-sm text-gray-700 dark:text-gray-300 font-mono">{{ col }}</span>
+          <span class="ml-auto text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">VARCHAR(4000)</span>
+        </label>
+        {% endfor %}
+        {% else %}
+        <div class="px-4 py-6 text-center text-sm text-gray-500">
+          Configurez d'abord l'étape Ingestion CSV pour voir les colonnes disponibles.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mt-4 flex gap-3">
+      <button @click="save" :disabled="!form.table_name || saving"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                     rounded-lg transition-colors disabled:opacity-50">
+        <span x-show="!saving">💾 Sauvegarder</span>
+        <span x-show="saving" x-cloak>Sauvegarde...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- DDL Preview -->
+  <div x-show="form.table_name && form.selected_columns.length > 0" x-cloak
+       class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+      <h3 class="font-semibold text-gray-900 dark:text-white">SQL généré (aperçu)</h3>
+    </div>
+    <div class="p-4">
+      <pre class="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-x-auto"><code x-text="generateDDL()"></code></pre>
+    </div>
+  </div>
+
+  <div class="flex justify-between">
+    <a href="/projects/{{ project_id }}/pipeline/ingestion"
+       class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300
+              rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm">
+      ← Étape 1 : Ingestion
+    </a>
+    <a href="/projects/{{ project_id }}/pipeline/ods"
+       class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+              rounded-lg transition-colors">
+      Étape 3 : ODS →
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function stagingStep(projectId, initConfig, availableCols) {
+  return {
+    form: {
+      table_name: initConfig.table_name || '',
+      batch_size: initConfig.batch_size || 1000,
+      truncate_before_load: initConfig.truncate_before_load !== false,
+      selected_columns: initConfig.selected_columns || [...availableCols],
+    },
+    saving: false,
+
+    toggleColumn(col) {
+      const idx = this.form.selected_columns.indexOf(col);
+      if (idx >= 0) {
+        this.form.selected_columns.splice(idx, 1);
+      } else {
+        this.form.selected_columns.push(col);
+      }
+    },
+
+    selectAll() {
+      this.form.selected_columns = [...availableCols];
+    },
+
+    selectNone() {
+      this.form.selected_columns = [];
+    },
+
+    generateDDL() {
+      if (!this.form.table_name || this.form.selected_columns.length === 0) return '';
+      const cols = this.form.selected_columns
+        .map(c => `  [${c}] VARCHAR(4000) NULL`)
+        .join(',\n');
+      return `IF OBJECT_ID('sta.${this.form.table_name}', 'U') IS NOT NULL\n  DROP TABLE [sta].[${this.form.table_name}];\n\nCREATE TABLE [sta].[${this.form.table_name}] (\n${cols}\n);`;
+    },
+
+    async save() {
+      this.saving = true;
+      try {
+        await apiCall(`/api/pipeline/${projectId}/steps/staging`, 'PUT',
+                      { config: this.form });
+        showToast('Configuration staging sauvegardée', 'success');
+      } catch(e) {} finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

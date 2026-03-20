@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}Connexions SQL Server — ETL Manager{% endblock %}
+{% block page_title %}Connexions SQL Server{% endblock %}
+
+{% block header_actions %}
+<button onclick="document.getElementById('add-conn-dialog').classList.remove('hidden')"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700
+               text-white text-sm font-medium rounded-lg transition-colors">
+  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+  </svg>
+  Nouvelle connexion
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  {% if connections %}
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    {% for conn in connections %}
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-5"
+         x-data="{ testing: false, testResult: null }">
+      <div class="flex items-start justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-semibold text-gray-900 dark:text-white text-sm">{{ conn.name }}</h3>
+            <p class="text-xs text-gray-500">{{ conn.server }}</p>
+          </div>
+        </div>
+        <button onclick="deleteConnection({{ conn.id }}, '{{ conn.name }}')"
+                class="text-gray-400 hover:text-red-500 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="text-xs text-gray-600 dark:text-gray-400 space-y-1 mb-3">
+        <div class="flex justify-between">
+          <span>Base de données</span>
+          <span class="font-medium text-gray-900 dark:text-white">{{ conn.database }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Authentification</span>
+          <span class="font-medium text-gray-900 dark:text-white">
+            {% if conn.use_windows_auth %}Windows{% else %}SQL{% endif %}
+          </span>
+        </div>
+      </div>
+
+      <div x-show="testResult" x-cloak class="mb-3 text-xs px-3 py-2 rounded-lg"
+           :class="testResult?.success ? 'bg-green-50 text-green-700 dark:bg-green-900/20' : 'bg-red-50 text-red-700 dark:bg-red-900/20'"
+           x-text="testResult?.message || testResult?.error"></div>
+
+      <button @click="testConn({{ conn.id }})" :disabled="testing"
+              class="w-full py-2 text-sm text-indigo-600 border border-indigo-200 dark:border-indigo-800
+                     hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors
+                     disabled:opacity-50">
+        <span x-show="!testing">🔌 Tester la connexion</span>
+        <span x-show="testing" x-cloak>Test en cours...</span>
+      </button>
+
+      <script>
+        // Inline Alpine method for this card
+        async function testConn(id) {
+          // Handled via Alpine x-data scope
+        }
+      </script>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-20">
+    <div class="w-20 h-20 bg-blue-50 dark:bg-blue-950 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-10 h-10 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Aucune connexion configurée</h3>
+    <p class="text-gray-500 mb-6">Ajoutez une connexion SQL Server pour accéder aux bases de données.</p>
+    <button onclick="document.getElementById('add-conn-dialog').classList.remove('hidden')"
+            class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700
+                   text-white font-medium rounded-lg transition-colors">
+      + Ajouter une connexion
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add connection dialog -->
+<div id="add-conn-dialog" class="fixed inset-0 z-50 hidden"
+     x-data="addConnForm()">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+       @click="document.getElementById('add-conn-dialog').classList.add('hidden')"></div>
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+    <div class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-5">Nouvelle connexion SQL Server</h3>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nom *</label>
+          <input x-model="form.name" type="text" placeholder="Connexion_PROD"
+                 class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Serveur *</label>
+            <input x-model="form.server" type="text" placeholder="serveur\instance"
+                   class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                          dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                          focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Port</label>
+            <input x-model.number="form.port" type="number" placeholder="1433"
+                   class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                          dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                          focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Base de données *</label>
+          <input x-model="form.database" type="text" placeholder="DataWarehouse"
+                 class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+        </div>
+
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" x-model="form.use_windows_auth"
+                 class="w-4 h-4 text-indigo-600 rounded border-gray-300"/>
+          <span class="text-sm text-gray-700 dark:text-gray-300">Authentification Windows</span>
+        </label>
+
+        <template x-if="!form.use_windows_auth">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Login</label>
+              <input x-model="form.username" type="text"
+                     class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                            dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                            focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mot de passe</label>
+              <input x-model="form.password" type="password"
+                     class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                            dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                            focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+            </div>
+          </div>
+        </template>
+
+        <div x-show="error" x-cloak
+             class="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm px-3 py-2 rounded-lg"
+             x-text="error"></div>
+      </div>
+
+      <div class="flex gap-3 mt-5">
+        <button @click="submit" :disabled="saving || !form.name || !form.server || !form.database"
+                class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                       rounded-lg transition-colors disabled:opacity-50 text-sm">
+          <span x-show="!saving">Créer la connexion</span>
+          <span x-show="saving" x-cloak>Enregistrement...</span>
+        </button>
+        <button @click="document.getElementById('add-conn-dialog').classList.add('hidden')"
+                class="px-4 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700
+                       dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-sm">
+          Annuler
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addConnForm() {
+  return {
+    form: { name: '', server: '', port: 1433, database: '', username: '', password: '', use_windows_auth: false },
+    saving: false,
+    error: '',
+
+    async submit() {
+      this.saving = true;
+      this.error = '';
+      try {
+        await apiCall('/api/connections/', 'POST', this.form);
+        showToast('Connexion créée', 'success');
+        setTimeout(() => location.reload(), 800);
+      } catch(e) {
+        this.error = e.message;
+      } finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+
+// Per-card test (need Alpine scope access — use event delegation)
+document.addEventListener('alpine:init', () => {
+  Alpine.data('connCard', (connId) => ({
+    testing: false,
+    testResult: null,
+    async testConn() {
+      this.testing = true;
+      this.testResult = null;
+      try {
+        this.testResult = await apiCall(`/api/connections/${connId}/test`, 'POST');
+      } catch(e) {
+        this.testResult = { success: false, error: e.message };
+      } finally {
+        this.testing = false;
+      }
+    }
+  }));
+});
+
+async function deleteConnection(id, name) {
+  if (!confirm(`Supprimer la connexion "${name}" ?`)) return;
+  try {
+    await apiCall(`/api/connections/${id}`, 'DELETE');
+    showToast(`Connexion "${name}" supprimée`, 'success');
+    setTimeout(() => location.reload(), 800);
+  } catch(e) {}
+}
+</script>
+{% endblock %}

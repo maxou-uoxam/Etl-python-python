@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Table de Faits — Projet {{ project_id }}{% endblock %}
+{% block page_title %}Étape 5 — Table de Faits{% endblock %}
+
+{% block breadcrumb %}
+<nav class="flex items-center gap-2 text-sm">
+  <a href="/" class="text-gray-500 hover:text-gray-700">Projets</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <a href="/projects/{{ project_id }}" class="text-gray-500 hover:text-gray-700">Projet #{{ project_id }}</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="font-semibold">Table de Faits</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div x-data="factStep({{ project_id }}, {{ config | tojson }}, {{ ods_columns | tojson }})" class="space-y-6">
+
+  <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900 dark:text-white mb-4">Configuration de la table de faits</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          Nom de la table <span class="text-red-500">*</span>
+        </label>
+        <div class="flex gap-2 items-center">
+          <span class="text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-2 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-700">fait.</span>
+          <input x-model="form.table_name" type="text" placeholder="fait_ventes"
+                 class="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded-r-lg focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Table ODS source</label>
+        <input x-model="form.source_ods_table" type="text"
+               class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                      dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                      focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+      </div>
+    </div>
+
+    <!-- Joins -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          Jointures avec les dimensions
+          <span class="text-gray-400 font-normal ml-1">(<span x-text="form.joins.length"></span>)</span>
+        </h3>
+        <button @click="addJoin"
+                class="text-sm text-indigo-600 hover:underline">
+          + Ajouter une jointure
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <template x-for="(join, idx) in form.joins" :key="idx">
+          <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Dimension <span x-text="idx + 1"></span>
+              </h4>
+              <button @click="form.joins.splice(idx, 1)" class="text-red-400 hover:text-red-600 text-xs">
+                Supprimer
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mb-3">
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Schéma</label>
+                <input x-model="join.dimension_schema" type="text" placeholder="dim"
+                       class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-300
+                              dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500
+                              text-gray-900 dark:text-white"/>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Table</label>
+                <input x-model="join.dimension_table" type="text" placeholder="dim_produit"
+                       class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-300
+                              dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500
+                              text-gray-900 dark:text-white"/>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Colonne SK</label>
+                <input x-model="join.surrogate_key_column" type="text" placeholder="sk_id"
+                       class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-300
+                              dark:border-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500
+                              text-gray-900 dark:text-white"/>
+              </div>
+            </div>
+
+            <!-- Join keys -->
+            <div>
+              <p class="text-xs text-gray-500 mb-2">Clés de jointure</p>
+              <template x-for="(jk, ki) in join.join_keys" :key="ki">
+                <div class="flex gap-2 items-center mb-1.5">
+                  <select x-model="jk.source"
+                          class="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                                 border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                                 focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white">
+                    <template x-for="col in odsCols">
+                      <option :value="col" x-text="col"></option>
+                    </template>
+                  </select>
+                  <span class="text-gray-400 text-xs">=</span>
+                  <input x-model="jk.dimension" type="text" placeholder="col_dim"
+                         class="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                                border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                                focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+                  <button @click="join.join_keys.splice(ki, 1)" class="text-red-400 text-xs hover:text-red-600">×</button>
+                </div>
+              </template>
+              <button @click="join.join_keys.push({source:'', dimension:''})"
+                      class="text-xs text-indigo-600 hover:underline">+ Clé</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Selected columns -->
+    <div>
+      <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        Colonnes ODS à inclure
+        <span class="text-xs text-gray-500 ml-1">(<span x-text="form.selected_columns.length"></span> sélectionnées)</span>
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <template x-for="col in odsCols">
+          <label class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-all text-xs font-mono"
+                 :class="form.selected_columns.includes(col)
+                   ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-400 text-indigo-700 dark:text-indigo-300'
+                   : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'">
+            <input type="checkbox" :checked="form.selected_columns.includes(col)"
+                   @change="toggleCol(col)" class="hidden"/>
+            <span x-text="col"></span>
+          </label>
+        </template>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <button @click="save" :disabled="!form.table_name || saving"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                     rounded-lg transition-colors disabled:opacity-50">
+        <span x-show="!saving">💾 Sauvegarder</span>
+        <span x-show="saving" x-cloak>...</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="flex justify-between">
+    <a href="/projects/{{ project_id }}/pipeline/dimension"
+       class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300
+              rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm">
+      ← Étape 4 : Dimensions
+    </a>
+    <a href="/projects/{{ project_id }}"
+       class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">
+      ✓ Pipeline configuré
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function factStep(projectId, initConfig, odsCols) {
+  return {
+    form: {
+      table_name: initConfig.table_name || '',
+      source_ods_table: initConfig.source_ods_table || '',
+      joins: initConfig.joins || [],
+      selected_columns: initConfig.selected_columns || [],
+      load_mode: initConfig.load_mode || 'insert',
+      business_key_columns: initConfig.business_key_columns || [],
+    },
+    odsCols: odsCols,
+    saving: false,
+
+    addJoin() {
+      this.form.joins.push({
+        dimension_schema: 'dim',
+        dimension_table: '',
+        surrogate_key_column: 'sk_id',
+        join_keys: [{ source: '', dimension: '' }],
+        alias: '',
+      });
+    },
+
+    toggleCol(col) {
+      const i = this.form.selected_columns.indexOf(col);
+      i >= 0 ? this.form.selected_columns.splice(i,1) : this.form.selected_columns.push(col);
+    },
+
+    async save() {
+      this.saving = true;
+      try {
+        await apiCall(`/api/pipeline/${projectId}/steps/fact`, 'PUT', { config: this.form });
+        showToast('Configuration table de faits sauvegardée', 'success');
+      } catch(e) {} finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

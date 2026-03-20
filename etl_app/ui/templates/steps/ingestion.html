@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Ingestion CSV — {{ project_id }}{% endblock %}
+{% block page_title %}Étape 1 — Ingestion CSV{% endblock %}
+
+{% block breadcrumb %}
+<nav class="flex items-center gap-2 text-sm">
+  <a href="/" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projets</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <a href="/projects/{{ project_id }}" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projet #{{ project_id }}</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="font-semibold text-gray-900 dark:text-white">Ingestion CSV</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div x-data="ingestionStep({{ project_id }}, {{ config | tojson }})" class="space-y-6">
+
+  <!-- File path configuration -->
+  <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900 dark:text-white mb-4">Configuration du fichier source</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          Chemin du fichier CSV
+        </label>
+        <div class="flex gap-2">
+          <input x-model="form.file_path" type="text"
+                 placeholder="C:\Data\ETL\DEV\PRODUIT\Entrée\fichier.csv"
+                 class="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+          <button @click="detectFormat" :disabled="!form.file_path"
+                  class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm
+                         font-medium rounded-lg transition-colors disabled:opacity-50">
+            Détecter
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Délimiteur</label>
+        <select x-model="form.delimiter"
+                class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                       dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                       focus:ring-indigo-500 text-gray-900 dark:text-white">
+          {% for d in delimiters %}
+          <option value="{{ d.value }}">{{ d.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Encodage</label>
+        <select x-model="form.encoding"
+                class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                       dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                       focus:ring-indigo-500 text-gray-900 dark:text-white">
+          {% for enc in encodings %}
+          <option value="{{ enc }}">{{ enc }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" x-model="form.has_header"
+                 class="w-4 h-4 text-indigo-600 rounded border-gray-300"/>
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Fichier avec en-têtes</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="mt-4 flex gap-3">
+      <button @click="loadPreview" :disabled="!form.file_path || loadingPreview"
+              class="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700
+                     text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors
+                     disabled:opacity-50">
+        <span x-show="!loadingPreview">👁 Prévisualiser</span>
+        <span x-show="loadingPreview" x-cloak>Chargement...</span>
+      </button>
+      <button @click="save" :disabled="saving"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                     rounded-lg transition-colors disabled:opacity-50">
+        <span x-show="!saving">💾 Sauvegarder</span>
+        <span x-show="saving" x-cloak>Sauvegarde...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- File info -->
+  <div x-show="fileInfo" x-cloak
+       class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
+    <div class="flex items-center gap-4 text-sm">
+      <span class="text-blue-700 dark:text-blue-300">
+        📄 Taille: <strong x-text="fileInfo?.file_size_mb + ' Mo'"></strong>
+      </span>
+    </div>
+  </div>
+
+  <!-- CSV Preview -->
+  <div x-show="preview && preview.columns && preview.columns.length > 0" x-cloak
+       class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900 dark:text-white">
+        Prévisualisation
+        <span class="text-sm font-normal text-gray-500 ml-2">
+          (<span x-text="preview.total_rows?.toLocaleString()"></span> lignes au total)
+        </span>
+      </h3>
+      <div class="flex items-center gap-2 text-sm text-gray-500">
+        <button @click="if(previewPage > 1) { previewPage--; loadPreviewPage(); }"
+                :disabled="previewPage <= 1"
+                class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700
+                       disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800">←</button>
+        <span x-text="`Page ${previewPage} / ${preview.total_pages || 1}`"></span>
+        <button @click="if(previewPage < preview.total_pages) { previewPage++; loadPreviewPage(); }"
+                :disabled="previewPage >= preview.total_pages"
+                class="px-2 py-1 rounded border border-gray-200 dark:border-gray-700
+                       disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800">→</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="bg-gray-50 dark:bg-gray-800">
+            <template x-for="col in preview.columns">
+              <th class="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300
+                         border-b border-gray-200 dark:border-gray-700 whitespace-nowrap"
+                  x-text="col"></th>
+            </template>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(row, ri) in preview.rows">
+            <tr :class="ri % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'">
+              <template x-for="cell in row">
+                <td class="px-3 py-2 text-gray-700 dark:text-gray-300 border-b
+                           border-gray-100 dark:border-gray-800 max-w-32 truncate"
+                    x-text="cell"></td>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Next step button -->
+  <div class="flex justify-between">
+    <a href="/projects/{{ project_id }}"
+       class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300
+              rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm">
+      ← Retour au projet
+    </a>
+    <a href="/projects/{{ project_id }}/pipeline/staging"
+       class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+              rounded-lg transition-colors">
+      Étape 2 : Staging →
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function ingestionStep(projectId, initConfig) {
+  return {
+    form: {
+      file_path: initConfig.file_path || '',
+      delimiter: initConfig.delimiter || ';',
+      encoding: initConfig.encoding || 'utf-8-sig',
+      has_header: initConfig.has_header !== false,
+    },
+    preview: null,
+    fileInfo: null,
+    previewPage: 1,
+    loadingPreview: false,
+    saving: false,
+
+    async detectFormat() {
+      if (!this.form.file_path) return;
+      try {
+        const data = await apiCall(
+          `/api/pipeline/${projectId}/csv/detect?file_path=${encodeURIComponent(this.form.file_path)}`
+        );
+        this.form.delimiter = data.delimiter;
+        this.form.encoding = data.encoding;
+        this.fileInfo = data;
+        showToast('Format détecté automatiquement', 'success');
+        await this.loadPreview();
+      } catch(e) {}
+    },
+
+    async loadPreview() {
+      if (!this.form.file_path) return;
+      this.loadingPreview = true;
+      try {
+        const params = new URLSearchParams({
+          file_path: this.form.file_path,
+          delimiter: this.form.delimiter,
+          encoding: this.form.encoding,
+          has_header: this.form.has_header,
+          page: this.previewPage,
+          page_size: 20,
+        });
+        this.preview = await apiCall(`/api/pipeline/${projectId}/csv/preview?${params}`);
+      } catch(e) {} finally {
+        this.loadingPreview = false;
+      }
+    },
+
+    async loadPreviewPage() {
+      await this.loadPreview();
+    },
+
+    async save() {
+      this.saving = true;
+      try {
+        const cfg = {
+          ...this.form,
+          detected_columns: this.preview?.columns || [],
+        };
+        await apiCall(`/api/pipeline/${projectId}/steps/ingestion`, 'PUT', { config: cfg });
+        showToast('Configuration sauvegardée', 'success');
+      } catch(e) {} finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

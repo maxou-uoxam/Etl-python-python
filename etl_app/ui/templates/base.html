@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr" x-data="{ darkMode: localStorage.getItem('theme') === 'dark' }"
+      :class="darkMode ? 'dark' : ''">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}ETL Manager{% endblock %}</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', dark: '#4f46e5' }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <!-- Monaco Editor -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/min/vs/loader.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .step-active { @apply bg-indigo-600 text-white; }
+    .step-done   { @apply bg-green-600 text-white; }
+    .step-pending{ @apply bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 3px; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen font-sans transition-colors duration-200"
+      x-init="$watch('darkMode', v => localStorage.setItem('theme', v ? 'dark' : 'light'))">
+
+  <!-- Sidebar -->
+  <div class="flex h-screen overflow-hidden">
+    <aside class="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shadow-sm">
+      <!-- Logo -->
+      <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+        <a href="/" class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12l2 2 4-4"/>
+            </svg>
+          </div>
+          <span class="text-lg font-bold text-gray-900 dark:text-white">ETL Manager</span>
+        </a>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        <a href="/"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800
+                  transition-colors {% if request.url.path == '/' %}bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400{% endif %}">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          Tableau de bord
+        </a>
+
+        <div class="pt-2">
+          <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Projets</p>
+          <a href="/projects/new"
+             class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Nouveau projet
+          </a>
+        </div>
+
+        <div class="pt-2">
+          <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Configuration</p>
+          <a href="/connections"
+             class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                    text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+            </svg>
+            Connexions SQL Server
+          </a>
+        </div>
+      </nav>
+
+      <!-- Theme toggle + version -->
+      <div class="px-4 py-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
+        <button @click="darkMode = !darkMode"
+                class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm
+                       text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <svg x-show="!darkMode" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+          </svg>
+          <svg x-show="darkMode" x-cloak class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <span x-text="darkMode ? 'Mode clair' : 'Mode sombre'"></span>
+        </button>
+        <p class="px-3 text-xs text-gray-400">ETL Manager v1.0.0</p>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+      <!-- Top bar -->
+      <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
+        <div>
+          {% block breadcrumb %}
+          <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{% block page_title %}ETL Manager{% endblock %}</h1>
+          {% endblock %}
+        </div>
+        <div class="flex items-center gap-3">
+          {% block header_actions %}{% endblock %}
+        </div>
+      </header>
+
+      <!-- Page content -->
+      <div class="flex-1 overflow-y-auto p-6">
+        <!-- Flash messages -->
+        {% block flash %}{% endblock %}
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast notifications -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+  <script>
+    // Toast notification helper
+    function showToast(message, type = 'success') {
+      const colors = {
+        success: 'bg-green-600',
+        error: 'bg-red-600',
+        info: 'bg-indigo-600',
+        warning: 'bg-yellow-600',
+      };
+      const toast = document.createElement('div');
+      toast.className = `${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg text-sm
+                          flex items-center gap-2 transform transition-all duration-300 translate-x-0`;
+      toast.innerHTML = `<span>${message}</span>`;
+      document.getElementById('toast-container').appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-full');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // HTMX global error handler
+    document.addEventListener('htmx:responseError', (evt) => {
+      showToast('Erreur: ' + evt.detail.xhr.statusText, 'error');
+    });
+
+    // API helper
+    async function apiCall(url, method = 'GET', body = null) {
+      const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+      };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(url, opts);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        showToast(err.detail || 'Erreur serveur', 'error');
+        throw new Error(err.detail);
+      }
+      return res.json();
+    }
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}ODS — Projet {{ project_id }}{% endblock %}
+{% block page_title %}Étape 3 — Transformation ODS{% endblock %}
+
+{% block breadcrumb %}
+<nav class="flex items-center gap-2 text-sm">
+  <a href="/" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projets</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <a href="/projects/{{ project_id }}" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Projet #{{ project_id }}</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="font-semibold">ODS</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div x-data="odsStep({{ project_id }}, {{ config | tojson }}, {{ source_columns | tojson }})" class="space-y-6">
+
+  <!-- Table name + source -->
+  <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900 dark:text-white mb-4">Configuration ODS</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          Nom de la table ODS <span class="text-red-500">*</span>
+        </label>
+        <div class="flex gap-2 items-center">
+          <span class="text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-2 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-700">ods.</span>
+          <input x-model="form.table_name" type="text" placeholder="nom_table"
+                 class="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                        dark:border-gray-700 rounded-r-lg focus:outline-none focus:ring-2
+                        focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Table staging source</label>
+        <input x-model="form.source_staging_table" type="text" placeholder="ex: sta_ventes"
+               class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300
+                      dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2
+                      focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column mappings -->
+  <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+      <h3 class="font-semibold text-gray-900 dark:text-white">Mapping des colonnes</h3>
+      <button @click="addMappingFromSource()"
+              class="text-sm text-indigo-600 hover:underline">
+        + Ajouter toutes les colonnes
+      </button>
+    </div>
+
+    <div class="p-4 space-y-2">
+      <div class="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 mb-1">
+        <div class="col-span-3">Colonne source</div>
+        <div class="col-span-3">Colonne cible</div>
+        <div class="col-span-2">Type SQL</div>
+        <div class="col-span-2">Taille</div>
+        <div class="col-span-1">Index</div>
+        <div class="col-span-1">Actions</div>
+      </div>
+
+      <template x-for="(mapping, idx) in form.column_mappings" :key="idx">
+        <div class="grid grid-cols-12 gap-2 items-center">
+          <div class="col-span-3">
+            <select x-model="mapping.source_column"
+                    class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                           border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                           focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white">
+              <template x-for="col in sourceColumns">
+                <option :value="col" x-text="col"></option>
+              </template>
+            </select>
+          </div>
+          <div class="col-span-3">
+            <input x-model="mapping.target_column" type="text"
+                   class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                          border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                          focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+          </div>
+          <div class="col-span-2">
+            <select x-model="mapping.target_type"
+                    class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                           border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                           focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white">
+              {% for t in sql_types %}
+              <option value="{{ t }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-span-2">
+            <input x-model.number="mapping.target_size" type="number"
+                   x-show="mapping.target_type === 'NVARCHAR'"
+                   placeholder="500"
+                   class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                          border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                          focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+            <span x-show="mapping.target_type !== 'NVARCHAR'"
+                  class="text-xs text-gray-400 px-2">—</span>
+          </div>
+          <div class="col-span-1 flex justify-center">
+            <input type="checkbox" x-model="mapping.is_index"
+                   class="w-4 h-4 text-indigo-600 rounded border-gray-300"/>
+          </div>
+          <div class="col-span-1 flex justify-center">
+            <button @click="form.column_mappings.splice(idx, 1)"
+                    class="text-red-400 hover:text-red-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <button @click="addMapping"
+              class="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700
+                     text-sm text-gray-500 rounded-lg hover:border-indigo-400 hover:text-indigo-600
+                     transition-colors mt-2">
+        + Ajouter une colonne
+      </button>
+    </div>
+  </div>
+
+  <!-- Calculated columns -->
+  <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+      <h3 class="font-semibold text-gray-900 dark:text-white">Colonnes calculées</h3>
+    </div>
+    <div class="p-4 space-y-3">
+      <template x-for="(calc, idx) in form.calculated_columns" :key="idx">
+        <div class="grid grid-cols-12 gap-2 items-start">
+          <div class="col-span-2">
+            <input x-model="calc.name" type="text" placeholder="nom_colonne"
+                   class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                          border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                          focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+          </div>
+          <div class="col-span-2">
+            <select x-model="calc.expression_type"
+                    class="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-800 border
+                           border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                           focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white">
+              <option value="python">Python</option>
+              <option value="sql">SQL</option>
+            </select>
+          </div>
+          <div class="col-span-7">
+            <input x-model="calc.expression" type="text"
+                   :placeholder="calc.expression_type === 'python' ? 'col_a + col_b' : 'UPPER([col_a])'"
+                   class="w-full px-2 py-1.5 text-xs font-mono bg-white dark:bg-gray-800 border
+                          border-gray-300 dark:border-gray-700 rounded focus:outline-none
+                          focus:ring-1 focus:ring-indigo-500 text-gray-900 dark:text-white"/>
+          </div>
+          <div class="col-span-1 flex justify-center pt-1">
+            <button @click="form.calculated_columns.splice(idx, 1)"
+                    class="text-red-400 hover:text-red-600">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </template>
+      <button @click="form.calculated_columns.push({name:'', expression:'', expression_type:'python'})"
+              class="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700
+                     text-sm text-gray-500 rounded-lg hover:border-indigo-400 hover:text-indigo-600
+                     transition-colors">
+        + Ajouter une colonne calculée
+      </button>
+    </div>
+  </div>
+
+  <!-- Save -->
+  <div class="flex justify-between">
+    <a href="/projects/{{ project_id }}/pipeline/staging"
+       class="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300
+              rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm">
+      ← Étape 2 : Staging
+    </a>
+    <div class="flex gap-3">
+      <button @click="save" :disabled="saving"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                     rounded-lg transition-colors disabled:opacity-50">
+        <span x-show="!saving">💾 Sauvegarder</span>
+        <span x-show="saving" x-cloak>...</span>
+      </button>
+      <a href="/projects/{{ project_id }}/pipeline/dimension"
+         class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                rounded-lg transition-colors">
+        Étape 4 : Dimensions →
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function odsStep(projectId, initConfig, srcCols) {
+  return {
+    form: {
+      table_name: initConfig.table_name || '',
+      source_staging_table: initConfig.source_staging_table || '',
+      column_mappings: initConfig.column_mappings || [],
+      calculated_columns: initConfig.calculated_columns || [],
+      filters: initConfig.filters || [],
+      index_columns: initConfig.index_columns || [],
+      selected_columns: initConfig.selected_columns || [...srcCols],
+    },
+    sourceColumns: srcCols,
+    saving: false,
+
+    addMapping() {
+      this.form.column_mappings.push({
+        source_column: this.sourceColumns[0] || '',
+        target_column: '',
+        target_type: 'NVARCHAR',
+        target_size: 500,
+        is_nullable: true,
+        is_index: false,
+      });
+    },
+
+    addMappingFromSource() {
+      const existing = new Set(this.form.column_mappings.map(m => m.source_column));
+      for (const col of this.sourceColumns) {
+        if (!existing.has(col)) {
+          this.form.column_mappings.push({
+            source_column: col,
+            target_column: col,
+            target_type: 'NVARCHAR',
+            target_size: 500,
+            is_nullable: true,
+            is_index: false,
+          });
+        }
+      }
+    },
+
+    async save() {
+      this.saving = true;
+      // Derive selected_columns from mappings
+      this.form.selected_columns = this.form.column_mappings.map(m => m.target_column || m.source_column);
+      this.form.index_columns = this.form.column_mappings
+        .filter(m => m.is_index)
+        .map(m => m.target_column || m.source_column);
+      try {
+        await apiCall(`/api/pipeline/${projectId}/steps/ods`, 'PUT', { config: this.form });
+        showToast('Configuration ODS sauvegardée', 'success');
+      } catch(e) {} finally {
+        this.saving = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

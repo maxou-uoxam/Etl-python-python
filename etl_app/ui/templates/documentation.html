@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Documentation — Projet {{ project_id }}{% endblock %}
+{% block page_title %}Documentation automatique{% endblock %}
+
+{% block breadcrumb %}
+<nav class="flex items-center gap-2 text-sm">
+  <a href="/" class="text-gray-500 hover:text-gray-700">Projets</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <a href="/projects/{{ project_id }}" class="text-gray-500 hover:text-gray-700">Projet #{{ project_id }}</a>
+  <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="font-semibold">Documentation</span>
+</nav>
+{% endblock %}
+
+{% block header_actions %}
+<div class="flex gap-2">
+  <button onclick="regenerate()"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700
+                 text-white text-sm font-medium rounded-lg transition-colors">
+    ↻ Régénérer
+  </button>
+  <a href="/api/projects/{{ project_id }}/export"
+     class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700
+            text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg
+            hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+    ↓ Export ZIP
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div x-data="{ activeTab: 'lineage' }" class="space-y-6">
+
+  <!-- Tabs -->
+  <div class="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
+    {% set tabs = [('lineage', 'Data Lineage'), ('metrics', 'Métriques'), ('diagram', 'Schéma ER')] %}
+    {% for tab_key, tab_label in tabs %}
+    <button @click="activeTab = '{{ tab_key }}'"
+            :class="activeTab === '{{ tab_key }}'
+              ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'"
+            class="px-4 py-2 text-sm font-medium rounded-lg transition-all">
+      {{ tab_label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- Data Lineage -->
+  <div x-show="activeTab === 'lineage'" x-cloak>
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+        <h2 class="font-semibold text-gray-900 dark:text-white">Data Lineage</h2>
+        <span class="text-xs text-gray-500">{{ files_generated }} fichiers générés</span>
+      </div>
+      <div class="p-6">
+        <div class="prose prose-sm dark:prose-invert max-w-none">
+          <pre class="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-auto whitespace-pre-wrap">{{ lineage_preview }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div x-show="activeTab === 'metrics'" x-cloak>
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+        <h2 class="font-semibold text-gray-900 dark:text-white">Métriques du projet</h2>
+      </div>
+      <div class="p-6">
+        <pre class="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-auto">{{ metrics | safe }}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mermaid diagram -->
+  <div x-show="activeTab === 'diagram'" x-cloak>
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+        <h2 class="font-semibold text-gray-900 dark:text-white">Schéma relationnel (Mermaid)</h2>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="mermaid bg-gray-50 dark:bg-gray-800 rounded-lg p-4 min-h-48" id="mermaid-diagram">
+          {{ mermaid | safe }}
+        </div>
+        <details>
+          <summary class="text-sm text-gray-500 cursor-pointer hover:text-gray-700">Voir le code Mermaid</summary>
+          <pre class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-auto">{{ mermaid }}</pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Mermaid.js -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+  });
+
+  async function regenerate() {
+    try {
+      await apiCall('/api/documentation/{{ project_id }}/generate', 'POST');
+      showToast('Documentation régénérée', 'success');
+      setTimeout(() => location.reload(), 800);
+    } catch(e) {}
+  }
+</script>
+{% endblock %}
