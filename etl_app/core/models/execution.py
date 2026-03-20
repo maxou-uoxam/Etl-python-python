@@ -2,7 +2,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Integer, DateTime, Float,
+    Column, String, Integer, DateTime, Float, Boolean,
     ForeignKey, Text, Enum as SAEnum, JSON
 )
 from sqlalchemy.orm import relationship
@@ -57,7 +57,3 @@ class ExecutionLog(Base):
 
     def __repr__(self) -> str:
         return f"<ExecutionLog(level={self.level}, message='{self.message[:50]}')>"
-
-
-# Need to add Boolean import
-from sqlalchemy import Boolean
