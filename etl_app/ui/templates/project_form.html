@@ -10,7 +10,34 @@
          name: '{{ project.name if project else '' }}',
          description: '{{ project.description if project else '' }}',
          loading: false,
-         error: ''
+         error: '',
+         projectId: {{ project.id if project else 'null' }},
+
+         async submitForm() {
+           if (!this.name.trim()) return;
+           this.loading = true;
+           this.error = '';
+           try {
+             const url = this.projectId ? '/api/projects/' + this.projectId : '/api/projects/';
+             const method = this.projectId ? 'PUT' : 'POST';
+             const res = await fetch(url, {
+               method,
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ name: this.name.trim(), description: this.description }),
+             });
+             const data = await res.json();
+             if (!res.ok) {
+               this.error = data.detail || 'Erreur lors de la sauvegarde';
+             } else {
+               showToast(this.projectId ? 'Projet mis à jour' : 'Projet créé avec succès', 'success');
+               setTimeout(() => window.location.href = '/projects/' + data.id, 800);
+             }
+           } catch (e) {
+             this.error = 'Erreur réseau, vérifiez la connexion';
+           } finally {
+             this.loading = false;
+           }
+         }
        }">
 
     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">
@@ -23,6 +50,7 @@
           Nom du projet <span class="text-red-500">*</span>
         </label>
         <input x-model="name" type="text" placeholder="ex: VENTES_2024"
+               @keydown.enter="submitForm()"
                class="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700
                       rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500
                       text-gray-900 dark:text-white placeholder-gray-400"/>
@@ -44,12 +72,18 @@
       </div>
 
       <div class="flex gap-3 pt-2">
-        <button @click="submitForm"
+        <button @click="submitForm()"
                 :disabled="loading || !name.trim()"
                 class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50
                        text-white font-medium rounded-lg transition-colors text-sm">
           <span x-show="!loading">{% if mode == 'create' %}Créer le projet{% else %}Sauvegarder{% endif %}</span>
-          <span x-show="loading" x-cloak>Enregistrement...</span>
+          <span x-show="loading" x-cloak class="flex items-center justify-center gap-2">
+            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Enregistrement...
+          </span>
         </button>
         <a href="/"
            class="px-4 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700
@@ -61,58 +95,4 @@
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-  function submitForm() {
-    // Reached via Alpine x-data, so reference via $data pattern
-    // Using direct DOM approach for simplicity
-  }
-
-  document.addEventListener('alpine:init', () => {
-    Alpine.data('projectForm', () => ({
-      name: '',
-      description: '',
-      loading: false,
-      error: '',
-
-      async submitForm() {
-        if (!this.name.trim()) return;
-        this.loading = true;
-        this.error = '';
-        try {
-          const res = await fetch('/api/projects/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: this.name.trim(), description: this.description }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            this.error = data.detail || 'Erreur lors de la création';
-          } else {
-            showToast(`Projet "${this.name}" créé avec succès`, 'success');
-            setTimeout(() => window.location.href = `/projects/${data.id}`, 800);
-          }
-        } catch (e) {
-          this.error = 'Erreur réseau';
-        } finally {
-          this.loading = false;
-        }
-      }
-    }));
-  });
-</script>
-<div x-data="projectForm()" class="hidden">
-  <!-- Re-wire form buttons -->
-</div>
-<script>
-  // Simpler: wire button clicks directly
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.querySelector('[\\@click="submitForm"]');
-    if (btn) {
-      btn._x_dataStack && btn._x_dataStack[0].submitForm;
-    }
-  });
-</script>
 {% endblock %}
