@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Test Mermaid</title></head>
+<body>
+<h2>Test Mermaid render</h2>
+<div id="output" style="border:1px solid #ccc; padding:10px; min-height:200px;">Chargement...</div>
+<pre id="log" style="background:#f5f5f5;padding:10px;font-size:12px;"></pre>
+
+<script>
+function log(msg) {
+  document.getElementById('log').textContent += msg + '\n';
+}
+
+const src = `erDiagram
+    DP16 {
+        int APP_NUMERO
+        int APP_NOM
+    }
+    CI {
+        int sk_ci_id PK
+    }
+    DP16 }|--|| CI : "FK_sk_ci_id"`;
+
+log('Source Mermaid défini');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" onload="onMermaidLoaded()" onerror="log('ERREUR: mermaid CDN non chargé')"></script>
+<script>
+function onMermaidLoaded() {
+  log('Mermaid chargé, version: ' + (mermaid.version || 'inconnue'));
+  try {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    log('mermaid.initialize OK');
+    mermaid.render('test-svg-1', src).then(({ svg }) => {
+      log('mermaid.render OK, SVG length: ' + svg.length);
+      document.getElementById('output').innerHTML = svg;
+    }).catch(e => {
+      log('ERREUR render: ' + e.message);
+      document.getElementById('output').textContent = 'Erreur: ' + e.message;
+    });
+  } catch(e) {
+    log('EXCEPTION: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>
